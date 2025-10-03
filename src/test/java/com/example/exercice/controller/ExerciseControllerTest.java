@@ -1,94 +1,96 @@
 
 package com.example.exercice.controller;
 
-import com.example.exercice.model.Exercise;
-import com.example.exercice.repository.ExerciseRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.Arrays;
+import com.example.exercice.model.dto.ExerciseDTO;
+import com.example.exercice.service.ExerciseService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+
+import java.util.Collections;
 import java.util.Optional;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(ExerciseController.class)
-public class ExerciseControllerTest {
+@ExtendWith(MockitoExtension.class)
+class ExerciseControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    @Mock
+    private ExerciseService exerciseService;
 
-    @MockBean
-    private ExerciseRepository exerciseRepository;
+    @InjectMocks
+    private ExerciseController exerciseController;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    private ExerciseDTO exercise;
 
-    @Test
-    public void getAllExercises_shouldReturnListOfExercises() throws Exception {
-        Exercise exercise1 = new Exercise("Exercise 1", "Description 1");
-        Exercise exercise2 = new Exercise("Exercise 2", "Description 2");
-        when(exerciseRepository.findAll()).thenReturn(Arrays.asList(exercise1, exercise2));
-
-        mockMvc.perform(get("/exercise"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.size()").value(2))
-                .andExpect(jsonPath("$[0].name").value("Exercise 1"))
-                .andExpect(jsonPath("$[1].name").value("Exercise 2"));
+    @BeforeEach
+    void setUp() {
+        exercise = ExerciseDTO.builder()
+                .id(1L)
+                .name("Test Exercise")
+                .description("Test Exercise Description")
+                .build();
     }
 
     @Test
-    public void getExerciseById_shouldReturnExercise() throws Exception {
-        Exercise exercise = new Exercise("Exercise 1", "Description 1");
-        exercise.setId(1L);
-        when(exerciseRepository.findById(1L)).thenReturn(Optional.of(exercise));
+    void getAllExercises() {
+        when(exerciseService.findAll()).thenReturn(Collections.singletonList(exercise));
 
-        mockMvc.perform(get("/exercise/1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Exercise 1"));
+        var result = exerciseController.getAllExercises();
+
+        assertEquals(Collections.singletonList(exercise), result);
     }
 
     @Test
-    public void createExercise_shouldReturnCreatedExercise() throws Exception {
-        Exercise exercise = new Exercise("New Exercise", "New Description");
-        when(exerciseRepository.save(any(Exercise.class))).thenReturn(exercise);
+    void getExerciseById() {
+        when(exerciseService.findById(1L)).thenReturn(Optional.of(exercise));
 
-        mockMvc.perform(post("/exercise")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(exercise)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.name").value("New Exercise"));
+        ResponseEntity<ExerciseDTO> response = exerciseController.getExerciseById(1L);
+
+        assertEquals(ResponseEntity.ok(exercise), response);
     }
 
     @Test
-    public void updateExercise_shouldReturnUpdatedExercise() throws Exception {
-        Exercise existingExercise = new Exercise("Existing Exercise", "Existing Description");
-        existingExercise.setId(1L);
-        Exercise updatedExercise = new Exercise("Updated Exercise", "Updated Description");
-        when(exerciseRepository.findById(1L)).thenReturn(Optional.of(existingExercise));
-        when(exerciseRepository.save(any(Exercise.class))).thenReturn(updatedExercise);
+    void createExercise() {
+        when(exerciseService.save(exercise)).thenReturn(exercise);
 
-        mockMvc.perform(put("/exercise/1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(updatedExercise)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Updated Exercise"));
+        ResponseEntity<ExerciseDTO> response = exerciseController.createExercise(exercise);
+
+        assertEquals(ResponseEntity.status(HttpStatus.CREATED).body(exercise), response);
     }
 
     @Test
-    public void deleteExercise_shouldReturnNoContent() throws Exception {
-        Exercise exercise = new Exercise("Exercise to delete", "Description");
-        exercise.setId(1L);
-        when(exerciseRepository.findById(1L)).thenReturn(Optional.of(exercise));
+    void updateExercise() {
+        var updatedExercise = ExerciseDTO.builder()
+                .id(1L)
+                .name("Updated Name")
+                .description("Updated Description")
+                .build();
 
-        mockMvc.perform(delete("/exercise/1"))
-                .andExpect(status().isNoContent());
+        when(exerciseService.findById(1L)).thenReturn(Optional.of(exercise));
+        when(exerciseService.save(exercise)).thenReturn(updatedExercise);
+
+        ResponseEntity<ExerciseDTO> response = exerciseController.updateExercise(1L, updatedExercise);
+
+        assertEquals(ResponseEntity.ok(updatedExercise), response);
+    }
+
+    @Test
+    void deleteExercise() {
+        when(exerciseService.findById(1L)).thenReturn(Optional.of(exercise));
+
+        ResponseEntity<Void> response = exerciseController.deleteExercise(1L);
+
+        assertEquals(ResponseEntity.noContent().build(), response);
+        verify(exerciseService).deleteById(1L);
     }
 }
